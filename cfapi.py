@@ -4,13 +4,18 @@ import re, os
 from flask_cors import *
 from flask import Flask, request, session, make_response, jsonify, url_for, redirect
 from urllib.parse import quote, unquote, urlencode
-
+from flask_pymongo import PyMongo
+from bson import ObjectId
+from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 
 CORS(app, supports_credentials=True)
 app.secret_key = '254127401'
-
-
+app.config.update(
+    MONGO_URI='mongodb://119.28.41.142:25412/cf',
+)
+socketio = SocketIO(app)
+mongo = PyMongo(app)
 #  计算 qrsig
 def genqrtoken(qrsig):
     e = 0
@@ -231,16 +236,16 @@ class loginQQ(object):
         print(json.loads(r))
         return json.loads(r)
 
-    def go(self):
+    def go(self,sSDID,iActivityId,iFlowId):
         gtk = genbkn(request.cookies.get('skey'))
-        url = 'http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId=152535&sServiceDepartment=group_f&sSDID=f2f146ceab460522dd63ad61f7745df8&isXhrPost=true'
+        url = 'http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId='+iActivityId+'&sServiceDepartment=group_f&sSDID='+sSDID+'&isXhrPost=true'
         # url='http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId=153469&sServiceDepartment=group_f&sSDID=f2f146ceab460522dd63ad61f7745df8&isXhrPost=true'
         data = {
             'ameVersion': 0.3,
             'sServiceType': 'cf',
-            'iActivityId': '152535',
+            'iActivityId': iActivityId,
             'sServiceDepartment': 'group_f',
-            'sSDID': 'f2f146ceab460522dd63ad61f7745df8',
+            'sSDID': sSDID,
             'isXhrPost': 'true',
             'gameId': '',
             'sArea': '',
@@ -256,20 +261,20 @@ class loginQQ(object):
             'rolelevel': '',
             'rolename': '',
             'areaid': '',
-            'iActivityId': 152535,
-            'iFlowId': 477478,
+            'iActivityId': iActivityId,
+            'iFlowId': iFlowId,
             'g_tk': gtk,
             'e_code': 0,
             'g_code': 0,
-            'eas_url': 'http%3A%2F%2Fcf.qq.com%2Fcp%2Fa20180719recall%2F',
+            'eas_url': 'http://cf.qq.com/',
             'eas_refer': 'http%3A%2F%2Fcf.qq.com%2F',
             'sServiceDepartment': 'group_f',
             'xhrPostKey': 'xhr_1534167746143'
         }
 
-        r = self.s.post(url, data=data, headers=self.headers, cookies=request.cookies)
-        print(r.json())
-        return r.json()
+        r = self.s.post(url, data=data, headers=self.headers, cookies=request.cookies).json()
+        # print(jsonify({'code':200,'data':r['flowRet']['sMsg']}))
+        return r['flowRet']['sMsg']
 
     def getShopInfo(self):
         id = list(self.Dcode.keys())[list(self.Dcode.values()).index(self.textEncode(request.cookies.get('areaid'), 0))]
@@ -308,16 +313,28 @@ class loginQQ(object):
         elif code == 0:
             return unquote(text)
 
+    #获取活动
+    def getIteam(self):
+        a = mongo.db.content.find({},{'name':'$name','iFlowId':'$iFlowId'})
+        Tieam=[]
+        for x in a:
+            name = {}
+            name['name'] = x['name']
+            name['num'] = len(x['iFlowId'])
+            name['id'] = str(x['_id'])
+            Tieam.append(name)
+        return jsonify({'code':200,'data':Tieam})
 
+    # 获取QQ所在城市
+    def getQqCity(self,qq):
+        url='http://yundong.qq.com/center/guest?_wv=2172899&asyncMode=1&uin='+qq
+        self.headers.update({'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; PRO 6 Build/MRA58K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043221 Safari/537.36 V1_AND_SQ_7.0.0_676_YYB_D QQ/7.0.0.3135 NetType/WIFI WebP/0.3.0 Pixel/1080'})
+        r=self.s.get(url,cookies=request.cookies, headers=self.headers).text
+        return r
 q = loginQQ()
 q.getDcode()
 
 
-# 获取默认大区
-
-# http://apps.game.qq.com/qlang/cf/recActivity/qlang/getArea.ql?service=cf&_=1534228840294
-
-# http://apps.game.qq.com/cf/a20170210information/getCfUserInfo.php?rd=0.878673494182264&_=1534228840296
 
 # 获取二维码
 @app.route('/')
@@ -337,12 +354,16 @@ def login():
     else:
         return q.qrLogin()
 
+@app.route('/qq')
+def qqCity():
+    qq=request.args.get('qq')
+    return q.getQqCity(qq)
 
 @app.route('/go')
 def go():
-    return '''
-    <p>%s</p>
-    ''' % q.go()
+    id=request.args.get('id')
+    idNum=request.args.get('idNum')
+    return q.go(id,idNum)
 
 
 # 注销
@@ -374,5 +395,27 @@ def getShopInfo():
     return q.getShopInfo()
 
 
+@app.route('/getIteam')
+def getIteam():
+    return q.getIteam()
+
+
+# @socketio.on('connect',namespace='/getgo')
+# def handle_request2():
+#     pass
+
+@socketio.on('event',namespace='/getgo')
+def handle_request(request):
+    if request.get('data')=='初夏最牛逼':
+        a = mongo.db.content.find()
+        print(a)
+        for x in a:
+            for num in x['iFlowId']:
+                status=q.go(x['sSDID'],x['iActivityId'],num)
+                emit('response',{'data':status,'name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) })
+        emit('response',{'data':'领取完毕！','name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())})
+    else:
+        emit('response','错误')
+
 if __name__ == '__main__':
-    app.run(debug=True)
+    socketio.run(app,debug=True,host='0.0.0.0',port=8083)
