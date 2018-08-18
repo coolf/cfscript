@@ -158,15 +158,15 @@ class loginQQ(object):
             return '未登陆！'
         else:
             D_id, areaid, level, qq = self.getDaqu()
-            hxbnum = self.getHxb()
-            cfnum = self.getCf()
+            # hxbnum = self.getHxb()
+            # cfnum = self.getCf()
             cfname = self.getName(D_id, qq)
             data = {
                 'qq': qq,
                 'areaid': areaid,
                 'level': level,
-                'hxbnum': hxbnum,
-                'cfnum': cfnum,
+                # 'hxbnum': hxbnum,
+                # 'cfnum': cfnum,
                 'cfname': cfname
             }
             res = make_response(jsonify({'code': 200, 'data': data}))
@@ -274,6 +274,7 @@ class loginQQ(object):
 
         r = self.s.post(url, data=data, headers=self.headers, cookies=request.cookies).json()
         # print(jsonify({'code':200,'data':r['flowRet']['sMsg']}))
+        print(r['flowRet']['sMsg'])
         return r['flowRet']['sMsg']
 
     def getShopInfo(self):
@@ -408,7 +409,6 @@ def getIteam():
 def handle_request(request):
     if request.get('data')=='初夏最牛逼':
         a = mongo.db.content.find()
-        print(a)
         for x in a:
             for num in x['iFlowId']:
                 status=q.go(x['sSDID'],x['iActivityId'],num)
@@ -418,4 +418,4 @@ def handle_request(request):
         emit('response','错误')
 
 if __name__ == '__main__':
-    socketio.run(app,debug=True,host='0.0.0.0',port=8083)
+    socketio.run(app,debug=True,host='0.0.0.0',port=5000)
