@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 import random, requests, time, json, base64
 import re, os
 from flask_cors import *
@@ -7,6 +6,7 @@ from urllib.parse import quote, unquote, urlencode
 from flask_pymongo import PyMongo
 from bson import ObjectId
 from flask_socketio import SocketIO, emit
+
 app = Flask(__name__)
 
 CORS(app, supports_credentials=True)
@@ -16,6 +16,8 @@ app.config.update(
 )
 socketio = SocketIO(app)
 mongo = PyMongo(app)
+
+
 #  计算 qrsig
 def genqrtoken(qrsig):
     e = 0
@@ -236,10 +238,11 @@ class loginQQ(object):
         print(json.loads(r))
         return json.loads(r)
 
-    def go(self,sSDID,iActivityId,iFlowId):
+    def go(self, sSDID, iActivityId, iFlowId):
         gtk = genbkn(request.cookies.get('skey'))
-        url = 'http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId='+iActivityId+'&sServiceDepartment=group_f&sSDID='+sSDID+'&isXhrPost=true'
+        url = 'http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId=' + iActivityId + '&sServiceDepartment=group_f&sSDID=' + sSDID + '&isXhrPost=true'
         # url='http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId=153469&sServiceDepartment=group_f&sSDID=f2f146ceab460522dd63ad61f7745df8&isXhrPost=true'
+        # url = 'http://cf.ams.game.qq.com/ams/ame/amesvr?ameVersion=0.3&sServiceType=cf&iActivityId=156454&sServiceDepartment=group_f&sSDID=f6df697985491cf211775f1e8c492661&isXhrPost=true'
         data = {
             'ameVersion': 0.3,
             'sServiceType': 'cf',
@@ -273,8 +276,6 @@ class loginQQ(object):
         }
 
         r = self.s.post(url, data=data, headers=self.headers, cookies=request.cookies).json()
-        # print(jsonify({'code':200,'data':r['flowRet']['sMsg']}))
-        print(r['flowRet']['sMsg'])
         return r['flowRet']['sMsg']
 
     def getShopInfo(self):
@@ -283,7 +284,7 @@ class loginQQ(object):
         url = 'http://kf.qq.com/cgi-bin/common'
         params = {
             'rand': 0.05177981547634203,
-            'command': 'command=C00006&fromtype=kfweb&fromtoolid=kfweb514&type=getCFSpend&area='+id+'&server_id=103&server_name=&area_id='+id+'&area_name='
+            'command': 'command=C00006&fromtype=kfweb&fromtoolid=kfweb514&type=getCFSpend&area=' + id + '&server_id=103&server_name=&area_id=' + id + '&area_name='
         }
         r = self.s.get(url, params=params, headers=self.headers, cookies=request.cookies).json()
         if r['resultcode'] == 0:
@@ -314,27 +315,30 @@ class loginQQ(object):
         elif code == 0:
             return unquote(text)
 
-    #获取活动
+    # 获取活动
     def getIteam(self):
-        a = mongo.db.content.find({},{'name':'$name','iFlowId':'$iFlowId'})
-        Tieam=[]
+        a = mongo.db.content.find({}, {'name': '$name', 'iFlowId': '$iFlowId'})
+        Tieam = []
         for x in a:
+            print(a)
             name = {}
             name['name'] = x['name']
             name['num'] = len(x['iFlowId'])
             name['id'] = str(x['_id'])
             Tieam.append(name)
-        return jsonify({'code':200,'data':Tieam})
+        return jsonify({'code': 200, 'data': Tieam})
 
     # 获取QQ所在城市
-    def getQqCity(self,qq):
-        url='http://yundong.qq.com/center/guest?_wv=2172899&asyncMode=1&uin='+qq
-        self.headers.update({'User-Agent':'Mozilla/5.0 (Linux; Android 6.0; PRO 6 Build/MRA58K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043221 Safari/537.36 V1_AND_SQ_7.0.0_676_YYB_D QQ/7.0.0.3135 NetType/WIFI WebP/0.3.0 Pixel/1080'})
-        r=self.s.get(url,cookies=request.cookies, headers=self.headers).text
+    def getQqCity(self, qq):
+        url = 'http://yundong.qq.com/center/guest?_wv=2172899&asyncMode=1&uin=' + qq
+        self.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; PRO 6 Build/MRA58K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/53.0.2785.49 Mobile MQQBrowser/6.2 TBS/043221 Safari/537.36 V1_AND_SQ_7.0.0_676_YYB_D QQ/7.0.0.3135 NetType/WIFI WebP/0.3.0 Pixel/1080'})
+        r = self.s.get(url, cookies=request.cookies, headers=self.headers).text
         return r
+
+
 q = loginQQ()
 q.getDcode()
-
 
 
 # 获取二维码
@@ -355,16 +359,18 @@ def login():
     else:
         return q.qrLogin()
 
+
 @app.route('/qq')
 def qqCity():
-    qq=request.args.get('qq')
+    qq = request.args.get('qq')
     return q.getQqCity(qq)
+
 
 @app.route('/go')
 def go():
-    id=request.args.get('id')
-    idNum=request.args.get('idNum')
-    return q.go(id,idNum)
+    id = request.args.get('id')
+    idNum = request.args.get('idNum')
+    return q.go(id, idNum)
 
 
 # 注销
@@ -401,21 +407,70 @@ def getIteam():
     return q.getIteam()
 
 
-# @socketio.on('connect',namespace='/getgo')
-# def handle_request2():
-#     pass
+@socketio.on('connect', namespace='/getgo')
+def handle_request2():
+    print('=======================connect==========')
 
-@socketio.on('event',namespace='/getgo')
+# @socketio.on('disconnect', namespace='/getgo')
+# def disconnect(sid):
+#     print('disconnect ')
+
+
+@socketio.on('event', namespace='/getgo')
+# def handle_request(request):
+#     if request.get('data')=='初夏最牛逼':
+#         a = mongo.db.content.find()
+#         for x in a:
+#             for num in x['iFlowId']:
+#                 print(request,'==========================')
+#                 status=q.go(x['sSDID'],x['iActivityId'],num)
+#                 emit('response',{'data':status,'name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) },broadcast=True)
+#         emit('response',{'data':'领取完毕！','name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())})
+#     else:
+#         emit('response','错误')
 def handle_request(request):
-    if request.get('data')=='初夏最牛逼':
-        a = mongo.db.content.find()
-        for x in a:
-            for num in x['iFlowId']:
-                status=q.go(x['sSDID'],x['iActivityId'],num)
-                emit('response',{'data':status,'name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) })
-        emit('response',{'data':'领取完毕！','name':x['name'],'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())})
-    else:
-        emit('response','错误')
+    if request.get('data') == '初夏最牛逼':
+        # 物品ID
+        uid = int(request.get('uid'))
+        # 请求的活动ID
+        sid = int(request.get('sid'))
+        # 获取活动数
+        activity = mongo.db.content.find()
+        # 活动ID
+        aid = activity.count()
+        if aid > sid and len(activity[sid]['iFlowId']) > uid:
+            try:
+                status = q.go(iFlowId=activity[sid]['iFlowId'][uid], sSDID=activity[sid]['sSDID'],
+                              iActivityId=activity[sid]['iActivityId'])
+                uid = uid +1 if len(activity[sid]['iFlowId']) > uid + 1 else 0
+                if uid == 0:
+                    emit('response', {'data': status, 'name': activity[sid]['name'], 'uid': uid, 'sid': sid+1,
+                                      'date': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                      'url': activity[sid]['url']})
+                else:
+                    emit('response', {'data': status, 'name':activity[sid]['name'],'uid': uid, 'sid': sid,'date':time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),'url':activity[sid]['url']})
+                # emit('response','123')
+            except Exception as e:
+                print(e)
+        else:
+                emit('response', {'data': '领取完毕！', 'name':'领取完毕！', 'uid': -1, 'sid': -1,
+                                  'date': time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()),
+                                  'url': ''})
+    #     if sid == 0 and uid == 0:
+    #
+    #     for x in a:
+    #         if uid == 0:
+    #             print(x)
+    #             status = q.go(x['sSDID'], x['iActivityId'], x['iFlowId'][uid])
+    #             print(status)
+    #             uid = uid + 1 if len(x['iFlowId']) >= uid + 1 else False
+    #             print(uid)
+    #             emit('response',{'data': status, 'uid': uid, 'sid': str(x['_id'])})
+    #         else:
+    #             pass
+    # else:
+    #     emit('response', '错误')
+
 
 if __name__ == '__main__':
-    socketio.run(app,debug=True,host='0.0.0.0',port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
